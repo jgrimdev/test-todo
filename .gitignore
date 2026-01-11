@@ -1,0 +1,15 @@
+# Ignoruj virtuální prostředí (je obrovské a zbytečné ho sdílet)
+.venv/
+venv/
+
+# Ignoruj zkompilované Python soubory
+__pycache__/
+*.pyc
+
+# Ignoruj naše lokální data (každý uživatel má mít své)
+tasks.json
+test_tasks.json
+
+# Ignoruj nastavení IDE
+.idea/
+.vscode/
