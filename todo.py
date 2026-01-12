@@ -82,7 +82,17 @@ class TaskManager:
             self.task_list = [Task(**item) for item in data_loaded]
             # Vysvětlení **item: Rozbalí slovník {"title": "X", "completed": True}
             # na argumenty Task(title="X", completed=True)
-
+# Tuto metodu přidej do TaskManager v todo.py
+    def mark_task_as_done(self, index: int) -> bool:
+        """
+        Čistá logika: Přijme číslo, změní stav, uloží.
+        Vrací True, pokud se to povedlo, False pokud index neexistuje.
+        """
+        if 0 <= index < len(self.task_list):
+            self.task_list[index].completed = True
+            self.save_to_file()
+            return True
+        return False
 def main() -> None:
     # Vytvoříme instanci. Ta už v sobě má prázdný list díky __init__
     manager = TaskManager()
