@@ -47,3 +47,7 @@ Teď to musíme dostat nahoru.
 git add requirements.txt README.md
 git commit -m "Add project documentation and dependency list"
 git push
+```
+
+uvicorn api:app --reload
+streamlit run frontend.py
