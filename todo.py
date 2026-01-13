@@ -1,128 +1,45 @@
-from typing import List, Dict, Any
-from dataclasses import dataclass, asdict
-import json,os
+from sqlalchemy.orm import Session
+from database import SessionLocal, engine, Base
+from models import TaskDB  # Importujeme naši definici tabulky
 
-@dataclass
-class Task:
-    title: str
-    completed: bool = False
+# Tímto příkazem reálně vytvoříme soubor tasks.db a tabulky v něm
+# (Pokud už existují, nic se nestane)
+Base.metadata.create_all(bind=engine)
+
 
 class TaskManager:
-    def __init__(self,filename: str = "tasks.json") -> None:
-        # Tady vzniká "vnitřní paměť" objektu
-        self.task_list: List[Task] = []
-        self.filename = filename
-        self.load_from_file()
+    def __init__(self):
+        # Při startu si otevřeme spojení do databáze
+        self.db: Session = SessionLocal()
 
-    # ZDE MAŽEME argument 'task_list'. Metoda potřebuje jen 'title'.
     def add_task(self, title: str) -> None:
-        if not title.strip():
-            print("⚠ Chyba: Název úkolu nesmí být prázdný.")
-            return
+        # 1. Vytvoříme objekt (jako dřív)
+        new_task = TaskDB(title=title, completed=False)
 
-        # new_task = {"title": title, "completed": False}
-        new_task = Task(title=title)
-        # Používáme SELF.task_list (naši vnitřní paměť)
-        self.task_list.append(new_task)
-        self.save_to_file()
-        print(f"✅ Úkol '{title}' přidán.")
+        # 2. Přidáme ho do "předsíně" databáze
+        self.db.add(new_task)
 
-    def show_tasks(self) -> None:
-        # Opět: pracujeme se self.task_list
-        if not self.task_list:
-            print("--- Seznam úkolů je prázdný ---")
-            return
+        # 3. Potvrdíme změnu (Commit) -> Teprve teď se zapíše do souboru
+        self.db.commit()
 
-        print("\n--- Seznam úkolů ---")
-        for index, task in enumerate(self.task_list):
-            status_icon = "[x]" if task.completed else "[ ]"
-            print(f"{index}. {status_icon} {task.title}")
-        print("--------------------\n")
+        # 4. Občerstvíme objekt (aby dostal přidělené ID)
+        self.db.refresh(new_task)
+        print(f"✅ Úkol '{title}' přidán s ID {new_task.id}.")
 
-    def complete_task(self) -> None:
-        # Voláme vlastní metodu přes self
-        self.show_tasks()
+    def get_tasks(self):
+        # SQL: SELECT * FROM tasks;
+        return self.db.query(TaskDB).all()
 
-        if not self.task_list:
-            return
+    def mark_task_as_done(self, task_id: int) -> bool:
+        # SQL: SELECT * FROM tasks WHERE id = task_id;
+        task = self.db.query(TaskDB).filter(TaskDB.id == task_id).first()
 
-        try:
-            user_input = input("Zadej číslo úkolu pro splnění: ")
-            index = int(user_input)
-
-            if 0 <= index < len(self.task_list):
-                self.task_list[index].completed = True
-                self.save_to_file()
-                print(f"✅ Úkol '{self.task_list[index].title}' označen jako hotový.")
-            else:
-                print(f"⚠ Chyba: Úkol s číslem {index} neexistuje.")
-
-        except ValueError:
-            print("⚠ Chyba: Musíš zadat platné číslo.")
-
-    def save_to_file(self):
-        # 1. Převedeme objekty Task na seznam slovníků
-        data_to_save = [asdict(task) for task in self.task_list]
-
-        # 2. Otevřeme soubor pro ZÁPIS (w = write)
-        with open(self.filename, "w", encoding="utf-8") as f:
-            json.dump(data_to_save, f, indent=4)  # indent=4 udělá hezké odsazení
-        print("💾 Uloženo.")
-
-    def load_from_file(self):
-        # Pokud soubor neexistuje, končíme (není co načítat)
-        if not os.path.exists(self.filename):
-            return
-
-        # Otevřeme soubor pro ČTENÍ (r = read)
-        with open("tasks.json", "r", encoding="utf-8") as f:
-            data_loaded = json.load(f)  # To nám vrátí seznam slovníků
-
-            # Musíme převést slovníky zpátky na objekty Task!
-            self.task_list = [Task(**item) for item in data_loaded]
-            # Vysvětlení **item: Rozbalí slovník {"title": "X", "completed": True}
-            # na argumenty Task(title="X", completed=True)
-# Tuto metodu přidej do TaskManager v todo.py
-    def mark_task_as_done(self, index: int) -> bool:
-        """
-        Čistá logika: Přijme číslo, změní stav, uloží.
-        Vrací True, pokud se to povedlo, False pokud index neexistuje.
-        """
-        if 0 <= index < len(self.task_list):
-            self.task_list[index].completed = True
-            self.save_to_file()
+        if task:
+            task.completed = True
+            self.db.commit()  # Uložení změny
             return True
         return False
-def main() -> None:
-    # Vytvoříme instanci. Ta už v sobě má prázdný list díky __init__
-    manager = TaskManager()
 
-    # POZOR: Proměnná 'tasks = []' už tu není potřeba!
-
-    running = True
-    while running:
-        print("\n=== TODO APP 2026 ===")
-        print("1. Přidat úkol")
-        print("2. Zobrazit úkoly")
-        print("3. Splnit úkol")
-        print("4. Ukončit")
-
-        choice = input("Vyber možnost: ")
-
-        if choice == '1':
-            title = input("Zadej název úkolu: ")
-            # Voláme metodu BEZ seznamu, ten už je uvnitř 'manager'
-            manager.add_task(title)
-        elif choice == '2':
-            manager.show_tasks()
-        elif choice == '3':
-            manager.complete_task()
-        elif choice == '4':
-            print("Ukončuji aplikaci. Ahoj!")
-            running = False
-        else:
-            print("⚠ Neplatná volba, zkus to znovu.")
-
-
-if __name__ == "__main__":
-    main()
+    # Důležité: Když končíme, zavřeme spojení
+    def __del__(self):
+        self.db.close()
